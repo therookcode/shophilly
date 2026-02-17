@@ -1,36 +1,36 @@
 # Build Stage
-FROM node:18-alpine AS build-stage
+FROM node:18-alpine AS builder
+
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json package-lock.json ./
 
-# Install dependencies with increased memory
-ENV NODE_OPTIONS="--max-old-space-size=4096"
-RUN npm ci --only=production=false
+# Install dependencies
+RUN npm ci
 
-# Copy source files
+# Copy all source files
 COPY . .
 
-# Build the application
+# Build the app
 RUN npm run build
 
 # Production Stage
-FROM nginx:stable-alpine AS production-stage
+FROM nginx:alpine
 
-# Copy built files
-COPY --from=build-stage /app/dist /usr/share/nginx/html
+# Copy custom nginx config
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Create nginx configuration for SPA
+# Create nginx config for SPA and port 8080
 RUN echo 'server { \
     listen 8080; \
-    server_name _; \
     root /usr/share/nginx/html; \
     index index.html; \
     location / { \
-    try_files $uri $uri/ /index.html; \
+    try_files $uri /index.html; \
     } \
     }' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 8080
+
 CMD ["nginx", "-g", "daemon off;"]
